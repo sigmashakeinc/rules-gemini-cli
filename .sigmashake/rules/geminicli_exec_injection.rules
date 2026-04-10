@@ -1,0 +1,63 @@
+# geminicli_exec_injection.rules — Gemini CLI execution injection safety.
+# Technology: geminicli | Capability: exec
+# Covers: README prompt injection (discovered day 2 post-launch), eval injection bypass,
+# allowlist mechanism bypass, default data collection, and auto-execute risks.
+
+rule no-gemini-readme-pipe-injection {
+  enabled true
+  priority 100
+  severity error
+  DENY execution
+  IF command REGEX "(cat|less|more|bat)\\s+.*README" AND command CONTAINS "|"
+  OR command REGEX "(cat|less|more|bat)\\s+.*README" AND command CONTAINS ";"
+  OR command REGEX "(cat|less|more|bat)\\s+.*README" AND command CONTAINS "&&"
+  MESSAGE "README prompt injection vector. Security researchers (Tracebit) discovered that Gemini CLI silently executes commands injected via README files — identified just 2 days after the June 25, 2025 launch. Attackers hide natural language commands in README.md that Gemini interprets as instructions. Piping or chaining README content with shell operators is blocked."
+}
+
+rule no-gemini-eval-injection {
+  enabled true
+  priority 100
+  severity error
+  DENY execution
+  IF command REGEX "eval\\s+\"\\$"
+  OR command REGEX "eval\\s+'\\$"
+  OR command REGEX "eval\\s+\\$\\("
+  OR command REGEX "source\\s+<\\("
+  OR command CONTAINS "eval \"$(curl"
+  OR command CONTAINS "eval \"$(wget"
+  MESSAGE "Eval injection bypass in shell scripts. A documented Gemini CLI security issue (GitHub issue #5495): eval with variable expansion bypasses Gemini's command restriction allowlist, enabling execution of commands that would otherwise be blocked. Use direct command execution without eval."
+}
+
+rule no-gemini-allowlist-bypass {
+  enabled true
+  priority 95
+  severity error
+  DENY execution
+  IF command CONTAINS "GEMINI_SANDBOX" AND command CONTAINS "off"
+  OR command REGEX "gemini.*--no-sandbox"
+  OR command REGEX "gemini.*--trust-all"
+  OR command REGEX "SANDBOX_MODE\\s*=\\s*(off|false|0|disabled)"
+  OR command REGEX "gemini.*--allow-all"
+  MESSAGE "Gemini CLI allowlist mechanism bypass. The July 2025 vulnerability (fixed in v0.1.14) exploited an improperly implemented allowlist that was meant to restrict command execution. Overriding sandbox or trust settings via environment variables replicates this bypass."
+}
+
+rule ask-gemini-default-invocation {
+  enabled true
+  priority 80
+  severity warning
+  ASK execution
+  IF command STARTS_WITH "gemini " AND command NOT CONTAINS "--no-analytics"
+  OR command STARTS_WITH "gemini " AND command NOT CONTAINS "--no-telemetry"
+  OR command STARTS_WITH "gemini " AND command NOT CONTAINS "--privacy"
+  MESSAGE "Gemini CLI with default telemetry settings. Users reported GDPR non-compliance: Gemini CLI includes no privacy notice, no data collection disclosure, and no opt-out mechanism in its CLI, help output, or documentation (GitHub issue #1489). Review what data is transmitted before processing sensitive project code."
+  PROMPT "Are you aware Gemini CLI collects prompts, code, and usage data by default with documented GDPR compliance issues? Consider reviewing the data collection settings before processing proprietary or sensitive source code."
+}
+
+rule log-gemini-auto-execute-mode {
+  enabled true
+  priority 70
+  severity info
+  LOG execution
+  IF command REGEX "gemini.*(-y|--yes|--auto|--non-interactive)"
+  MESSAGE "Gemini CLI running in auto-execute/non-interactive mode. README prompt injection attacks are most dangerous with auto-execution enabled — injected commands run without human review. Logged for audit."
+}

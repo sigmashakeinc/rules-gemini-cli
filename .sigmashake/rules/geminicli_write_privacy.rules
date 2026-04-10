@@ -1,0 +1,50 @@
+# geminicli_write_privacy.rules — Gemini CLI write safety and privacy protection.
+# Technology: geminicli | Capability: write
+# Covers: GDPR non-compliant telemetry, Google Cloud credential access,
+# sandbox config write protection, and project init auditing.
+
+rule no-gemini-telemetry-enable {
+  enabled true
+  priority 90
+  severity error
+  DENY write
+  IF path REGEX "gemini.*config" AND content CONTAINS "telemetry" AND content CONTAINS "true"
+  OR path REGEX "gemini.*settings" AND content CONTAINS "analytics" AND content CONTAINS "true"
+  OR path REGEX "gemini.*settings" AND content CONTAINS "send_data" AND content CONTAINS "true"
+  MESSAGE "Gemini CLI telemetry enablement blocked. Gemini CLI has documented GDPR non-compliance: no privacy notice, no data collection disclosure, and no opt-out mechanism in the CLI or documentation (GitHub issue #1489, Jan 2025). Enabling additional telemetry increases data exposure without adequate consent mechanisms."
+}
+
+rule ask-gemini-gcloud-credential-access {
+  enabled true
+  priority 90
+  severity warning
+  ASK read
+  IF path CONTAINS "application_default_credentials"
+  OR path CONTAINS "gcloud/credentials"
+  OR path REGEX "\\.config/gcloud/"
+  OR path REGEX "gcloud.*access_token"
+  MESSAGE "Google Cloud credentials accessed from Gemini CLI. Gemini CLI collects prompts and related code by default. Combined with GCloud credential access, there is risk of cloud resource access data being transmitted in telemetry without adequate GDPR consent."
+  PROMPT "Is GCloud credential access required for this task? Gemini CLI has documented data collection practices with no opt-out. Consider using service account impersonation with minimal scope instead of default application credentials."
+}
+
+rule no-gemini-sandbox-disable {
+  enabled true
+  priority 90
+  severity error
+  DENY write
+  IF path REGEX "gemini.*sandbox" AND content CONTAINS "disabled"
+  OR path REGEX "gemini.*allowlist" AND content CONTAINS "disabled"
+  OR content CONTAINS "sandbox_mode" AND content LINE_REGEX ":\\s*(false|off|0|disabled)"
+  MESSAGE "Gemini CLI sandbox configuration modification blocked. The allowlist mechanism bypass (GitHub issue #5495) exploited disabled or misconfigured sandbox settings. Sandbox configuration must be managed manually, not by AI agents."
+}
+
+rule log-gemini-project-config-init {
+  enabled true
+  priority 55
+  severity info
+  LOG write
+  IF path REGEX "\\.gemini/"
+  OR path ENDS_WITH ".geminirc"
+  OR path REGEX "gemini.*\\.json$"
+  MESSAGE "Gemini CLI project config written. Audit for prompt injection payloads. README-based prompt injection was discovered within 2 days of Gemini CLI's launch — new config files in project directories warrant careful review."
+}

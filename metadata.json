@@ -1,0 +1,3 @@
+{
+  "description": "Gemini CLI is a command-line interface for interacting with Google's Gemini models in a development environment. These rules govern execution safety, privacy, and prevention of prompt injection via markdown files."
+}
