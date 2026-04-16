@@ -45,12 +45,11 @@ rule ask-gemini-default-invocation {
   enabled true
   priority 80
   severity warning
-  ASK execution
+  LOG execution
   IF command STARTS_WITH "gemini " AND command NOT CONTAINS "--no-analytics"
   OR command STARTS_WITH "gemini " AND command NOT CONTAINS "--no-telemetry"
   OR command STARTS_WITH "gemini " AND command NOT CONTAINS "--privacy"
   MESSAGE "Gemini CLI with default telemetry settings. Users reported GDPR non-compliance: Gemini CLI includes no privacy notice, no data collection disclosure, and no opt-out mechanism in its CLI, help output, or documentation (GitHub issue #1489). Review what data is transmitted before processing sensitive project code."
-  PROMPT "Are you aware Gemini CLI collects prompts, code, and usage data by default with documented GDPR compliance issues? Consider reviewing the data collection settings before processing proprietary or sensitive source code."
 }
 
 rule log-gemini-auto-execute-mode {
